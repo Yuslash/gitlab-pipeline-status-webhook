@@ -24,28 +24,39 @@ function extractErrorLogSection(trace) {
 // Get latest pipeline
 const getLatestPipeline = async () => {
   const url = `https://gitlab.com/api/v4/projects/${PROJECT_ID}/pipelines/latest`;
+  console.log('🔍 Fetching latest pipeline...');
   const res = await fetch(url, { headers });
   const data = await res.json();
+  console.log('✅ Latest pipeline fetched:', data);
   return data.id;
 };
 
 // Get jobs of a pipeline
 const getJobs = async (pipelineId) => {
   const url = `https://gitlab.com/api/v4/projects/${PROJECT_ID}/pipelines/${pipelineId}/jobs`;
+  console.log(`🔍 Fetching jobs for pipeline ID: ${pipelineId}...`);
   const res = await fetch(url, { headers });
-  return await res.json();
+  const data = await res.json();
+  console.log('✅ Jobs fetched:', data);
+  return data;
 };
 
 // Get trace log of a job
 const getJobTrace = async (jobId) => {
   const url = `https://gitlab.com/api/v4/projects/${PROJECT_ID}/jobs/${jobId}/trace`;
+  console.log(`🔍 Fetching trace for job ID: ${jobId}...`);
   const res = await fetch(url, { headers });
-  return await res.text(); // plain text
+  const trace = await res.text();
+  console.log('✅ Trace fetched');
+  return trace;
 };
 
 // Webhook handler
 export default async function handler(req, res) {
+  console.log('📬 Webhook received:', req.body);
+
   if (req.headers['x-gitlab-token'] !== SECRET_TOKEN) {
+    console.log('❌ Invalid secret token');
     return res.status(403).json({ message: 'Forbidden' });
   }
 
@@ -56,10 +67,13 @@ export default async function handler(req, res) {
   const event = req.body;
 
   if (event.object_kind !== 'pipeline') {
+    console.log('ℹ️ Not a pipeline event. Ignored.');
     return res.status(200).json({ message: 'Not a pipeline event, ignored' });
   }
 
   const pipelineStatus = event.object_attributes.status;
+  console.log('📦 Pipeline status:', pipelineStatus);
+
   let responsePayload = {
     pipelineStatus,
     failedJob: null
@@ -73,16 +87,21 @@ export default async function handler(req, res) {
       const failedJob = jobs.find(job => job.status === 'failed');
 
       if (failedJob) {
+        console.log('🚨 A job failed. Fetching trace logs...');
         const trace = await getJobTrace(failedJob.id);
         const cleanTrace = extractErrorLogSection(trace);
+        console.log('🚨 Error log:\n', cleanTrace);
 
         responsePayload.failedJob = {
           id: failedJob.id,
           name: failedJob.name,
           trace: cleanTrace
         };
+      } else {
+        console.log('✅ All jobs passed');
       }
     } catch (err) {
+      console.error('❌ Error fetching data:', err.message);
       return res.status(500).json({ message: 'Error fetching job logs', error: err.message });
     }
   }
