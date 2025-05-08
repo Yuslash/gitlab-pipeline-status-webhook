@@ -29,44 +29,42 @@ const getJobTrace = async (jobId) => {
 };
 
 export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    const event = req.body;
-
-    if (event.object_kind === 'pipeline') {
-      const status = event.object_attributes.status;
-
-      try {
-        const pipelineId = await getLatestPipeline();
-        const jobs = await getJobs(pipelineId);
-
-        const failedJob = jobs.find(job => job.status === 'failed');
-        if (failedJob) {
-          const trace = await getJobTrace(failedJob.id);
-
-          return res.status(200).json({
-            status: 'failed',
-            failedJob: {
-              id: failedJob.id,
-              name: failedJob.name,
-              trace
-            }
-          });
-        } else {
-          return res.status(200).json({
-            status: 'success',
-            message: 'All jobs passed'
-          });
-        }
-      } catch (err) {
-        return res.status(500).json({
-          status: 'error',
-          message: err.message || 'Unexpected error'
-        });
-      }
+    const SECRET_TOKEN = process.env.GITLAB_SECRET_TOKEN; // Add the secret token from your environment variable
+  
+    // Check if the X-Gitlab-Token matches your secret token
+    if (req.headers['x-gitlab-token'] !== SECRET_TOKEN) {
+      console.log('❌ Invalid secret token');
+      return res.status(403).json({ message: 'Forbidden' });
     }
-
-    return res.status(200).json({ message: 'Webhook received but not a pipeline event' });
-  } else {
-    return res.status(405).send('Method not allowed');
+  
+    console.log('📬 Webhook received:', req.body);
+  
+    if (req.method === 'POST') {
+      const event = req.body;
+  
+      if (event.object_kind === 'pipeline') {
+        console.log('📦 Pipeline status:', event.object_attributes.status);
+  
+        try {
+          const pipelineId = await getLatestPipeline();
+          const jobs = await getJobs(pipelineId);
+  
+          const failedJob = jobs.find(job => job.status === 'failed');
+          if (failedJob) {
+            console.log('🚨 A job failed. Fetching trace logs...');
+            const trace = await getJobTrace(failedJob.id);
+            console.log('🚨 Error log:', trace);
+          } else {
+            console.log('✅ All jobs passed');
+          }
+        } catch (err) {
+          console.error('❌ Error fetching data:', err.message);
+        }
+      }
+  
+      res.status(200).json({ message: 'Webhook received and processed' });
+    } else {
+      res.status(405).send('Method not allowed');
+    }
   }
-}
+  
