@@ -1,0 +1,10 @@
+{
+    "version": 2,
+    "functions": {
+      "api/gitlab-webhook.js": {
+        "memory": 128,
+        "maxDuration": 10
+      }
+    }
+  }
+  
