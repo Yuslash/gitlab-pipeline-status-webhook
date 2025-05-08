@@ -1,6 +1,4 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
-dotenv.config();
 
 const GITLAB_TOKEN = process.env.GITLAB_TOKEN;
 const PROJECT_ID = '69686811'; // Replace with your actual project ID
